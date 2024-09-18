@@ -14,7 +14,7 @@ export function tick() {
     bg[1] = (bg[1] % 255) + 2
     bg[2] = (bg[2] % 255) + 1
 
-    bgColor = new RL.Color(255, 255, 255, 255)
+    bgColor = new RL.Color(bg[0], bg[1], bg[2], 255)
 }
 
 
