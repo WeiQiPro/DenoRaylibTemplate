@@ -1,6 +1,6 @@
-import {Window, Drawing, Timing, AudioDevice as Audio, WHITE } from "raylib";
+import {Window, Drawing, Timing, AudioDevice as Audio, WHITE, Texture2D } from "raylib";
 
-const RL = {Window, Drawing, Timing, Audio, WHITE };
+const RL = {Window, Drawing, Timing, Audio, WHITE, Texture2D };
 
 type METADATA = {
     SCREEN_WIDTH: number;
@@ -12,6 +12,7 @@ type METADATA = {
 type GAMEDATA = {
     tick: ()=> void;
     draw: ()=> void;
+    sprites: Texture2D[];
 };
 
 const META_PATH: string = "./src/metadata.ts";
@@ -28,13 +29,11 @@ let gamedata: GAMEDATA;
 
 // Load initial metadata and game data
 metadata = await loadMetaDataFromFile(META_PATH);
+let metaWatcher: Deno.FsWatcher;
+let metaIterator: AsyncIterableIterator<Deno.FsEvent>;
 
-const metaWatcher: Deno.FsWatcher = Deno.watchFs(META_PATH);
-const metaIterator = metaWatcher[Symbol.asyncIterator]();
-
-gamedata = await loadFromFile(metadata.ENTRY_POINT);
-let gameWatcher: Deno.FsWatcher = Deno.watchFs(metadata.ENTRY_POINT);
-let gameIterator = gameWatcher[Symbol.asyncIterator]();
+let gameWatcher: Deno.FsWatcher;
+let gameIterator: AsyncIterableIterator<Deno.FsEvent>;
 
 async function loadMetaDataFromFile(path: string) {
     const version = path + `?version=${Date.now()}`;
@@ -98,7 +97,10 @@ function renameWindow() {
     FLAGS.title = false;
 }
 
-function initializeRaylib() {
+async function initializeRaylib() {
+    metaWatcher = Deno.watchFs(META_PATH);
+    metaIterator = metaWatcher[Symbol.asyncIterator]();
+
     RL.Window.init(
         metadata.SCREEN_WIDTH,
         metadata.SCREEN_HEIGHT,
@@ -106,6 +108,12 @@ function initializeRaylib() {
     );
     RL.Audio.init();
     RL.Timing.setTargetFPS(60);
+
+    gamedata = await loadFromFile(metadata.ENTRY_POINT);
+    gameWatcher = Deno.watchFs(metadata.ENTRY_POINT);
+    gameIterator = gameWatcher[Symbol.asyncIterator]();
+
+    console.log("GameData: ", gamedata);
 }
 
 async function checkMetaFile() {
@@ -147,10 +155,12 @@ function hotReloadRaylibDrawing() {
 
         setTimeout(hotReloadRaylibDrawing, 1000 / 60);
     } else {
+        console.log("Closing window");
+        gamedata.sprites.forEach((sprite) => sprite.unload());
         RL.Window.close();
         RL.Audio.close();
     }
 }
 
-initializeRaylib();
+await initializeRaylib();
 hotReloadRaylibDrawing();
